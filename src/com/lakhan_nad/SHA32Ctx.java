@@ -1,5 +1,7 @@
 package com.lakhan_nad;
 
+import java.util.Arrays;
+
 class SHA32Ctx{
 		private static final int[] constants = new int[] {0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
 						0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
@@ -13,20 +15,25 @@ class SHA32Ctx{
 
 		// Working Variables
 		int[] h;
-		int[] w;
-		int dataLen;
-		long lenRead;
-		int done;
-		byte[] message;
+		private int[] w;
+		private int dataLen;
+		private long lenRead;
+		private int done;
+		private boolean finalized;
+		private byte[] message;
 
+		// Hiding Default Constructor
 		private SHA32Ctx(){
-				this.reset();
+				this.resetWorkingVariables();
 		}
 
 		// Constructor
 		SHA32Ctx(int[] hashes){
-				h = hashes.clone();
-				this.reset();
+				this.h = new int[8];
+				System.arraycopy(this.h, 0, hashes, 0, 8);
+				this.w = new int[16];
+				this.resetWorkingVariables();
+				this.finalized = false;
 		}
 
 		private static int sigmaBig0(int n){
@@ -53,22 +60,45 @@ class SHA32Ctx{
 				return (x & y) ^ (x & z) ^ (y & z);
 		}
 
-		private void reset(){
+		private void resetWorkingVariables(){
 				this.dataLen = 0;
 				this.lenRead = 0;
-				this.w = new int[16];
+				Arrays.fill(this.w, 0);
 				this.done = 0;
 				this.message = null;
 		}
 
-		public void shaUpdate(){
+		public void resetContext(){
 				SHA32Ctx ctx = this;
-				if (ctx.message == null) {
-						return;
+				Arrays.fill(ctx.h,0);
+				if(!this.finalized){
+						this.resetWorkingVariables();
 				}
+				this.finalized = false;
+		}
+
+		private void shaUpdate(){
+				SHA32Ctx ctx = this;
 				byte[] message = ctx.message;
 				ctx.lenRead += message.length;
-				for (int i = 0, j = 4; i < message.length; i += 4, j += 4) {
+				int z = 0;
+				if (ctx.done % 4 > 0) {
+						ctx.done = ctx.done % 4;
+						do {
+								ctx.w[ctx.dataLen] = (ctx.w[ctx.dataLen] << 8) + (message[z] & 0xff);
+								z++;
+								ctx.done++;
+						} while (ctx.done < 4 && z < message.length);
+						if (ctx.done % 4 == 0) {
+								ctx.dataLen++;
+								ctx.done = 0;
+						}
+				}
+				for (int i = z, j = i + 4; i < message.length; i += 4, j += 4) {
+						if (ctx.dataLen == 16) {
+								ctx.shaTransform();
+								ctx.dataLen = 0;
+						}
 						if (j <= message.length) {
 								ctx.w[ctx.dataLen] = 0;
 								ctx.w[ctx.dataLen] = (ctx.w[ctx.dataLen] << 8) + (message[i] & 0xff);
@@ -92,21 +122,19 @@ class SHA32Ctx{
 										ctx.w[ctx.dataLen] = (ctx.w[ctx.dataLen] << 8) + (message[i] & 0xff);
 								}
 						}
-						if (ctx.dataLen == 16) {
-								ctx.shaTransform();
-								ctx.dataLen = 0;
-						}
 				}
-				ctx.message = null;
 		}
 
 		public void processMessage(byte[] message){
 				SHA32Ctx ctx = this;
-				if (ctx.message != null) {
-						shaUpdate();
+				if(this.finalized){
+						return;
 				}
-				ctx.message = message;
-				ctx.shaUpdate();
+				if(message != null && message.length != 0) {
+						ctx.message = message;
+						ctx.shaUpdate();
+				}
+				ctx.message = null;
 		}
 
 		public void shaFinal(){
@@ -135,7 +163,7 @@ class SHA32Ctx{
 				ctx.w[15] = ((int) messageLength);
 				ctx.w[14] = ((int) (messageLength >>> 32));
 				ctx.shaTransform();
-				ctx.reset();
+				ctx.resetWorkingVariables();
 		}
 
 		private void shaTransform(){
