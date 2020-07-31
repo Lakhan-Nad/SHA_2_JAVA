@@ -1,5 +1,6 @@
 package com.lakhan_nad;
 
+import javax.swing.plaf.synth.SynthLookAndFeel;
 import java.math.BigInteger;
 import java.util.Arrays;
 
@@ -23,7 +24,7 @@ class SHA64Ctx{
 		private static final byte one = (byte) 0b10000000;
 
 		// Working Variables
-		long[] h;
+		private long[] h;
 		private long[] w;
 		private int dataLen;
 		private int done;
@@ -31,17 +32,17 @@ class SHA64Ctx{
 		private boolean finalized;
 		private byte[] message;
 
-		private SHA64Ctx(){
-				this.resetWorkingVariables();
+		// Constructor
+		SHA64Ctx(){
+				this.h = new long[8];
+				this.w = new long[16];
 		}
 
-		// Constructor
+		// Construct as well as Reset for Process
 		SHA64Ctx(long[] hashes){
 				this.h = new long[8];
-				System.arraycopy(this.h,0,hashes,0,8);
 				this.w = new long[16];
-				this.resetWorkingVariables();
-				this.finalized = false;
+				this.resetContext(hashes);
 		}
 
 		private static long sigmaBig0(long n){
@@ -77,21 +78,42 @@ class SHA64Ctx{
 				return v;
 		}
 
-		private void resetWorkingVariables(){
-				this.dataLen = 0;
-				this.done = 0;
-				this.lenRead = 0;
-				Arrays.fill(this.w,0);
-				this.message = null;
+		public void resetContext(long[] hashes){
+				SHA64Ctx ctx = this;
+				System.arraycopy(hashes,0,ctx.h,0,8);
+				ctx.finalized = false;
+				ctx.dataLen = 0;
+				ctx.done = 0;
+				ctx.lenRead = 0;
+				Arrays.fill(ctx.w,0);
+				ctx.message = null;
 		}
 
-		public void resetContext(){
+		public void getHashBytes(byte[] cpy, int inBytes){
 				SHA64Ctx ctx = this;
-				Arrays.fill(ctx.h,0);
-				if(!this.finalized){
-						this.resetWorkingVariables();
+				inBytes = Math.min(inBytes, cpy.length);
+				inBytes = Math.min(inBytes, ctx.h.length * 4);
+				int z = 64;
+				int p = 0;
+				for (int i = 0; i < inBytes; i++) {
+						if (z == 0) {
+								p++;
+								z = 64;
+						}
+						z -= 8;
+						cpy[i] = (byte) (ctx.h[p] >>> z);
 				}
-				this.finalized = false;
+		}
+
+		public String getHexString(int inBytes){
+				SHA64Ctx ctx = this;
+				inBytes = Math.min(inBytes, ctx.h.length*4);
+				int x = (inBytes + 7)/8;
+				String str = "";
+				for (int i = 0; i < x; i++) {
+						str = str.concat(String.format("%1$16s", Long.toHexString(ctx.h[i])).replace(' ', '0'));
+				}
+				return str.substring(0,inBytes*2);
 		}
 
 		private void shaUpdate(){
@@ -126,20 +148,31 @@ class SHA64Ctx{
 				}
 		}
 
+		/* TODO: PREVENT MESSAGE FROM BEING
+		         ALTERED UNTIL PROCESS IS COMPLETE
+		 */
 		public void processMessage(byte[] message){
 				SHA64Ctx ctx = this;
-				if(this.finalized){
+				if(ctx.finalized){
 						return;
 				}
 				if(message != null && message.length != 0) {
 						ctx.message = message;
-						ctx.shaUpdate();
+						try {
+								ctx.shaUpdate();
+						}catch (Exception E){
+								System.out.println(E.getLocalizedMessage());
+						}finally {
+								ctx.message = null;
+						}
 				}
-				ctx.message = null;
 		}
 
 		public void shaFinal(){
 				SHA64Ctx ctx = this;
+				if(ctx.finalized){
+						return;
+				}
 				if (ctx.done % 8 == 0) {
 						ctx.w[ctx.dataLen] = 0;
 						ctx.done = 0;
@@ -167,8 +200,7 @@ class SHA64Ctx{
 				ctx.w[15] = byteArrToLong(arr, 0, j);
 				ctx.w[14] = byteArrToLong(arr, 8, z);
 				ctx.shaTransform();
-				this.finalized = true;
-				this.resetWorkingVariables();
+				ctx.finalized = true;
 		}
 
 		private void shaTransform(){

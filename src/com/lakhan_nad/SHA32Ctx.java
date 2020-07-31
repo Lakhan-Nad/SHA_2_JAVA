@@ -14,26 +14,24 @@ class SHA32Ctx{
 		private static final byte one = (byte) 0b10000000;
 
 		// Working Variables
-		int[] h;
+		private int[] h;
 		private int[] w;
 		private int dataLen;
 		private long lenRead;
 		private int done;
-		private boolean finalized;
 		private byte[] message;
 
-		// Hiding Default Constructor
-		private SHA32Ctx(){
-				this.resetWorkingVariables();
+		// Constructor
+		SHA32Ctx(){
+				this.h = new int[8];
+				this.w = new int[16];
 		}
 
-		// Constructor
+		// Construct as well as Reset for Process
 		SHA32Ctx(int[] hashes){
 				this.h = new int[8];
-				System.arraycopy(this.h, 0, hashes, 0, 8);
 				this.w = new int[16];
-				this.resetWorkingVariables();
-				this.finalized = false;
+				this.resetContext(hashes);
 		}
 
 		private static int sigmaBig0(int n){
@@ -60,21 +58,41 @@ class SHA32Ctx{
 				return (x & y) ^ (x & z) ^ (y & z);
 		}
 
-		private void resetWorkingVariables(){
-				this.dataLen = 0;
-				this.lenRead = 0;
-				Arrays.fill(this.w, 0);
-				this.done = 0;
-				this.message = null;
+		public void resetContext(int[] hashes){
+				SHA32Ctx ctx = this;
+				System.arraycopy(hashes, 0, ctx.h, 0, 8);
+				ctx.dataLen = 0;
+				ctx.lenRead = 0;
+				Arrays.fill(ctx.w, 0);
+				ctx.done = 0;
+				ctx.message = null;
 		}
 
-		public void resetContext(){
+		public void getHashBytes(byte[] cpy, int inBytes){
 				SHA32Ctx ctx = this;
-				Arrays.fill(ctx.h,0);
-				if(!this.finalized){
-						this.resetWorkingVariables();
+				inBytes = Math.min(inBytes, cpy.length);
+				inBytes = Math.min(inBytes, ctx.h.length * 4);
+				int z = 32;
+				int p = 0;
+				for (int i = 0; i < inBytes; i++) {
+						if (z == 0) {
+								p++;
+								z = 32;
+						}
+						z -= 8;
+						cpy[i] = (byte) (ctx.h[p] >>> z);
 				}
-				this.finalized = false;
+		}
+
+		public String getHexString(int inBytes){
+				SHA32Ctx ctx = this;
+				inBytes = Math.min(inBytes, ctx.h.length*4);
+				int x = (inBytes + 3)/4;
+				String str = "";
+				for (int i = 0; i < x; i++) {
+						str = str.concat(String.format("%1$8s", Integer.toHexString(ctx.h[i])).replace(' ', '0'));
+				}
+				return str.substring(0,inBytes*2);
 		}
 
 		private void shaUpdate(){
@@ -125,16 +143,21 @@ class SHA32Ctx{
 				}
 		}
 
+		/* TODO: PREVENT MESSAGE FROM BEING
+		         ALTERED UNTIL PROCESS IS COMPLETE
+		 */
 		public void processMessage(byte[] message){
 				SHA32Ctx ctx = this;
-				if(this.finalized){
-						return;
-				}
-				if(message != null && message.length != 0) {
+				if (message != null && message.length != 0) {
 						ctx.message = message;
-						ctx.shaUpdate();
+						try {
+								ctx.shaUpdate();
+						} catch (Exception E) {
+								System.out.println(E.getLocalizedMessage());
+						} finally {
+								ctx.message = null;
+						}
 				}
-				ctx.message = null;
 		}
 
 		public void shaFinal(){
@@ -163,7 +186,6 @@ class SHA32Ctx{
 				ctx.w[15] = ((int) messageLength);
 				ctx.w[14] = ((int) (messageLength >>> 32));
 				ctx.shaTransform();
-				ctx.resetWorkingVariables();
 		}
 
 		private void shaTransform(){
