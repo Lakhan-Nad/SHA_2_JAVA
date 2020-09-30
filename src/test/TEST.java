@@ -4,8 +4,10 @@ import com.lakhan_nad.*;
 
 public class TEST{
 		public static void main(String[] args){
-				byte[] x = new byte[] {(byte) 0xf4, (byte) 0xf5, (byte) 0x67, (byte) 0x90, (byte) 0x11, (byte) 0x23, (byte) 0xf4, (byte) 0xf5, (byte) 0x67, (byte) 0x90, (byte) 0x11, (byte) 0x23, (byte) 0xf4, (byte) 0xf5, (byte) 0x67, (byte) 0x90, (byte) 0x11, (byte) 0x23
-								, (byte) 0xf4, (byte) 0xf5, (byte) 0x67, (byte) 0x90, (byte) 0x11, (byte) 0x23};
+				byte[] x = new byte[0];
+				if(args.length > 0){
+						x = args[0].getBytes();
+				}
 				// SHA256
 				System.out.println(SHA256.hash(x));
 				// SHA224

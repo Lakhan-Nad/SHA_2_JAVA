@@ -14,8 +14,8 @@ class SHA32Ctx{
 		private static final byte one = (byte) 0b10000000;
 
 		// Working Variables
-		private int[] h;
-		private int[] w;
+		private final int[] h;
+		private final int[] w;
 		private int dataLen;
 		private long lenRead;
 		private int done;

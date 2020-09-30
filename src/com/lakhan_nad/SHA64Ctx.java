@@ -1,6 +1,5 @@
 package com.lakhan_nad;
 
-import javax.swing.plaf.synth.SynthLookAndFeel;
 import java.math.BigInteger;
 import java.util.Arrays;
 
@@ -24,8 +23,8 @@ class SHA64Ctx{
 		private static final byte one = (byte) 0b10000000;
 
 		// Working Variables
-		private long[] h;
-		private long[] w;
+		private final long[] h;
+		private final long[] w;
 		private int dataLen;
 		private int done;
 		private long lenRead;
